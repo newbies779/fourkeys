@@ -9,7 +9,7 @@ This guide describes how to set up Four Keys with your GitHub or GitLab project.
     1.  [Collecting incident data](#collecting-incident-data)
 
 ## Before you begin
-
+> We recommend using [Cloud Shell](https://cloud.google.com/shell) to install Four Keys
 1.  Install [GCloud SDK](https://cloud.google.com/sdk/install).
 1. Install [Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli).
 1.  You must be owner on a Google Cloud project that has billing enabled. You may either use this project to house the architecture for the Four Keys, or you will be given the option to create new projects. If you create new projects, the original Google Cloud project will NOT be altered during set up, but **the billing information from this parent project will be applied to any projects created**.
@@ -67,6 +67,12 @@ Step by step, here's what's happening:
 Terraform maintains information about infrastucture in persistent state storage, known as a backend. By default, this is maintained in a file named `terraform.tfstate`, saved to the same directory that Terraform is executed from. This local backend is fine for a one-time setup, but if you plan to maintain and use your Four Keys infrastructure, it's recommended to choose a remote backend. (Alternatively, you may choose to use Terraform only for the initial setup, and then use other tools--like `gcloud` or the Cloud Console--for ongoing modifications. That's fine.)
 
 > To learn how to use a remote backend for robust storage of Terraform state, see: [Terraform Language: Backends](https://www.terraform.io/docs/language/settings/backends/index.html)
+
+### Purging resources created by Terraform
+If something goes wrong during Terraform setup, you may be able to run `terraform destroy` to delete the resources that were created. However, it's possible for the Terraform state to become inconsistent with your project, leaving Terraform unaware of resources (yet their existance will prevent subsequent installations from working). If that happens, the best option is usually to delete the GCP project and start a new one. If that's not possible, you can force-remove all of the four keys resources in your project by running:
+```shell
+./ci/project_cleaner.sh --project=<your_fourkeys_project>
+```
 
 ## Integrating with a live repo
 
@@ -137,53 +143,41 @@ If you have an existing installation of The Four Keys, created using the now-dep
 
 ### Collecting deployment data
 
-#### Configuring Cloud Build to deploy on GitHub Pull Request merges
+1.  For whichever CI/CD system you are using, set it up to send Webhook events to the event-handler.  
 
-1.  Go back to your repo's main page.
-1.  At the top of the GitHub page, click **Marketplace**.
-1.  Search for **Cloud Build**.
-1.  Select **Google Cloud Build**.
-1.  Click **Set Up Plan**.
-1.  Click **Set up with Google Cloud Build**.
-1.  Select **Only select repositories**.
-1.  Fill in your forked repo.
-1.  Log in to Google Cloud Platform.
-1.  Add your new Four Keys project named `fourkeys-XXXXX`.
-1.  Select your repo.
-1.  Click **Connect repository**.
-1.  Click **Create push trigger**.
-
-And now, whenever a pull request is merged into master of your fork, Cloud Build will trigger a deploy into prod and data will flow into your Four Keys project.
-
-#### Configuring Cloud Build to deploy on GitLab merges
-
-1.  Go to your Four Keys project and [create a service account](https://cloud.google.com/iam/docs/creating-managing-service-accounts#iam-service-accounts-create-console) called `gitlab-deploy`.
-1.  [Create a JSON service account key](https://cloud.google.com/iam/docs/creating-managing-service-account-keys#iam-service-account-keys-create-console) for your `gitlab-deploy` service account.
-1.  In your GitLab repo, navigate to `Settings` on the left-hand menu and then select `CI/CD`.
-1.  Save your account key under variables.
-    1.  In the **key** field, input `SERVICE_ACCOUNT`.
-    1.  In the **Value** field, input the JSON . 
-    1.  Select **Protect variable**.
-1.  Save your Google Cloud project-id under variables.
-    1.  In the **key** field, input `PROJECT_ID`.
-    1.  In the **value** field, input your `project-id`.
-1.  Add a `.gitlab-ci.yml` file to your repo.
+#### Configuring CircleCI to deploy on GitHub or Gitlab merges
+                             
+1.  Add a `.circleci.yaml` file to your repo.
     ```
-    image: google/cloud-sdk:alpine
-
-    deploy_production:
-      stage: deploy
-      environment: Production
-      only:
-      - master
-      script:
-      - echo $SERVICE_ACCOUNT > /tmp/$CI_PIPELINE_ID.json
-      - gcloud auth activate-service-account --key-file /tmp/$CI_PIPELINE_ID.json
-      - gcloud builds submit . --project $PROJECT_ID
-      after_script:
-      - rm /tmp/$CI_PIPELINE_ID.json
+    version: 2.1
+    executors:
+      default:
+        ...
+    jobs:
+      build:
+        executor: default
+        steps:
+          - run: make build
+      deploy:
+        executor: default
+        steps:
+          - run: make deploy
+    workflows:
+      version: 2
+      build_and_deploy_on_master: # A workflow whose name contains 'deploy' will be used in the query to build the deployments view
+        jobs:
+          - build:
+              name: build
+              filters: &master_filter
+                branches:
+                  only: master
+          - deploy:
+              name: deploy
+              filters: *master_filter
+              requires:
+                - build
     ```
-
+ 
 This setup will trigger a deployment on any `push` to the `master` branch.
 
 ### Collecting incident data
