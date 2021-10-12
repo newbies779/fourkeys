@@ -36,8 +36,8 @@ if [[ ${AUTO} == 'true' ]]
 then
     # populate setup variables (for use in testing/dev)
     make_new_project='y'
-    git_system_id=2
-    cicd_system_id=1
+    git_system_id=1
+    cicd_system_id=4
     generate_mock_data=y
     CLEAN='true'
 else
