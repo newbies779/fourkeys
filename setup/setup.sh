@@ -37,7 +37,7 @@ then
     # populate setup variables (for use in testing/dev)
     make_new_project='y'
     git_system_id=1
-    cicd_system_id=4
+    cicd_system_id=5
     generate_mock_data=y
     CLEAN='true'
 else
@@ -80,7 +80,7 @@ if [ $make_new_project == 'y' ]; then
     # PARENT_FOLDER=$(gcloud projects describe ${PARENT_PROJECT} --format="value(parent.id)")
     BILLING_ACCOUNT=$(gcloud beta billing projects describe ${PARENT_PROJECT} --format="value(billingAccountName)" || sed -e 's/.*\///g')
     FOURKEYS_PROJECT=$(printf "fourkeys-%06d" $((RANDOM%999999)))
-    FOURKEYS_REGION="us-central1"
+    FOURKEYS_REGION="asia-southeast1"
     BIGQUERY_REGION="US"
     
     # try to create project; if fail, exit script
